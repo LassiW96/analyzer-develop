@@ -49,6 +49,7 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "THaVarList.h"
+#include "Helper.h"          // for MakeVectorFromList
 #include "TClass.h"          // for TClass
 #include "TCollection.h"     // for TIter
 #include "TFunction.h"       // for TFunction
@@ -60,10 +61,10 @@
 #include "TRegexp.h"         // for TRegexp
 #include "TSeqCollection.h"  // for TSeqCollection
 #include "TString.h"         // for TString, operator==, operator+, kNPOS, etc.
-#include "Helper.h"          // for Podd::MakeVectorFromList
 #include <cassert>           // for assert
+#include <cstring>           // for strchr, strncpy
 #include <memory>            // for unique_ptr, make_unique
-#include <string>            // for TFunction::GetReturnTypeNormalizedName
+#include <string>            // for string
 #include <tuple>             // for get, tuple
 #include <utility>           // for move, cmp_greater_equal
 
@@ -627,11 +628,18 @@ THaVar* THaVarList::Find( const char* name ) const
   // Find a variable in the list.  If 'name' has array syntax ("var[3]"),
   // the search is performed for the array basename ("var").
 
-  TString s(name);
-  auto pos = s.Index('[');
-  if( pos != kNPOS )
-    s.Remove(pos);
-  return dynamic_cast<THaVar*>(FindObject(s));
+  if( !name )
+    return nullptr;
+  TObject* obj;
+  if( const auto* p = strchr(name, '[') ) {
+    auto len = p - name;
+    auto basename = make_unique<char[]>(len + 1);
+    strncpy(basename.get(), name, len);
+    basename[len] = '\0';
+    obj = FindObject(basename.get());
+  } else
+    obj = FindObject(name);
+  return static_cast<THaVar*>(obj);
 }
 
 //_____________________________________________________________________________
