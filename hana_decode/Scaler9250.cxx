@@ -29,6 +29,7 @@ void Scaler9250::Init()
   fNumChan = fgThisType != fgModuleTypes().end() ? fgThisType->fNchan : 16;
   fWordsExpect = fNumChan;
   GenInit();
+  fModelNum = 9250;
 }
 
 }
