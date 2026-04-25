@@ -63,23 +63,23 @@ namespace Decoder {
     static ModuleType GetModuleType( Int_t ID );
 #endif
 
-    Bool_t IsMultiBlockMode() const {return fMultiBlockMode; };
-    Bool_t BlockIsDone() const { return fBlockIsDone; };
-    virtual void SetFirmware(Int_t fw) {fFirmwareVers=fw;};
+    Bool_t IsMultiBlockMode() const {return fMultiBlockMode; }
+    Bool_t BlockIsDone() const { return fBlockIsDone; }
+    virtual void SetFirmware(Int_t fw) {fFirmwareVers=fw;}
 
-    UInt_t GetBlockSize() const { return block_size; };
+    UInt_t GetBlockSize() const { return block_size; }
 
     // inheriting classes need to implement one or more of these
-    virtual UInt_t GetData( UInt_t /*chan*/) const { return 0; };
-    virtual UInt_t GetData( UInt_t /*chan*/, UInt_t /*hit*/) const { return 0; };
-    virtual UInt_t GetData( UInt_t, UInt_t, UInt_t) const { return 0; };
+    virtual UInt_t GetData( UInt_t /*chan*/) const { return 0; }
+    virtual UInt_t GetData( UInt_t /*chan*/, UInt_t /*hit*/) const { return 0; }
+    virtual UInt_t GetData( UInt_t, UInt_t, UInt_t) const { return 0; }
     virtual UInt_t GetData( EModuleDataType /*emode*/,
-                            UInt_t /*chan*/, UInt_t /*ievent*/) const { return 0; };
+                            UInt_t /*chan*/, UInt_t /*ievent*/) const { return 0; }
     virtual UInt_t GetData( EModuleDataType,
-                            UInt_t, UInt_t, UInt_t ) const { return 0; };
-    virtual UInt_t GetOpt( UInt_t /* rdata */) const { return 0; };
+                            UInt_t, UInt_t, UInt_t ) const { return 0; }
+    virtual UInt_t GetOpt( UInt_t /* rdata */) const { return 0; }
 
-    virtual UInt_t GetOpt( UInt_t /*chan*/, UInt_t /*hit*/) const { return 0; }; //1190
+    virtual UInt_t GetOpt( UInt_t /*chan*/, UInt_t /*hit*/) const { return 0; } //1190
 
     virtual Int_t  Decode(const UInt_t *p) = 0;
     // Loads slot data from [evbuffer,pstop]. pstop points to last word of data
@@ -90,16 +90,16 @@ namespace Decoder {
     // This is used in bank decoding (bank_decode)
     virtual UInt_t LoadSlot( THaSlotData* sldat, const UInt_t *evbuffer,
                              UInt_t pos, UInt_t len);
-    virtual UInt_t LoadNextEvBuffer( THaSlotData* /* sldat */) { return 0; };
+    virtual UInt_t LoadNextEvBuffer( THaSlotData* /* sldat */) { return 0; }
 
-    virtual UInt_t GetNumChan()         const { return fNumChan; };
+    virtual UInt_t GetNumChan()            const { return fNumChan; }
 
     virtual UInt_t GetNumEvents( EModuleDataType /*emode*/,
-                                 UInt_t /*chan*/ ) const { return 0; };
-    virtual UInt_t GetNumEvents( UInt_t )  const { return 0; };
-    virtual UInt_t GetNumEvents()          const { return 0; };
-    virtual UInt_t GetNumSamples( UInt_t ) const { return 0; };
-    virtual Int_t  GetMode()               const { return fMode; };
+                                 UInt_t /*chan*/ ) const { return 0; }
+    virtual UInt_t GetNumEvents( UInt_t )  const { return 0; }
+    virtual UInt_t GetNumEvents()          const { return 0; }
+    virtual UInt_t GetNumSamples( UInt_t ) const { return 0; }
+    virtual Int_t  GetMode()               const { return fMode; }
 
     virtual void   SetSlot( UInt_t crate, UInt_t slot, UInt_t header = 0,
                             UInt_t mask = 0, Int_t modelnum = 0 ) {
@@ -109,9 +109,9 @@ namespace Decoder {
       fHeaderMask = mask;
       fModelNum   = modelnum;
     }
-
-    virtual void   SetBank( Int_t bank ) { fBank = bank; };
-    virtual void   SetMode( Int_t mode ) { fMode = mode; };
+    virtual void   SetModel( Int_t num ) { fModelNum = num; }
+    virtual void   SetBank( Int_t bank ) { fBank = bank; }
+    virtual void   SetMode( Int_t mode ) { fMode = mode; }
 
     virtual void   Init();
     virtual void   Init( const char* configstr );
@@ -120,8 +120,10 @@ namespace Decoder {
 
     virtual Bool_t IsSlot( UInt_t rdata );
 
-    UInt_t         GetCrate() const { return fCrate; };
-    UInt_t         GetSlot()  const { return fSlot; };
+    UInt_t         GetCrate() const { return fCrate; }
+    UInt_t         GetSlot()  const { return fSlot; }
+    Int_t          GetBank()  const { return fBank; }
+    Int_t          GetModelNum() const { return fModelNum; }
 
     virtual void   SetDebugFile( std::ofstream* file )
     {
@@ -135,8 +137,8 @@ namespace Decoder {
 
     virtual void DoPrint() const;
 
-    virtual Bool_t IsMultiFunction() { return false; };
-    virtual Bool_t HasCapability( EModuleDataType ) { return false; };
+    virtual Bool_t IsMultiFunction() { return false; }
+    virtual Bool_t HasCapability( EModuleDataType ) { return false; }
 
     // Invalid input data exception, thrown by "Load*" functions
     class module_data_error : public std::runtime_error {
