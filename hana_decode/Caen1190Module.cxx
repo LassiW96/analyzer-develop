@@ -332,12 +332,10 @@ UInt_t Caen1190Module::LoadBank( THaSlotData* sldat, const UInt_t* evbuffer,
     index_buffer = 0;
     return LoadNextEvBuffer(sldat);
 
-  } else {
-    // Single block: decode, starting at global header
-    return LoadSlot(sldat, evbuffer, ibeg, iend-ibeg)
-           + fNfill;
   }
-  // not reached
+  // Single block: decode, starting at global header
+  return LoadSlot(sldat, evbuffer, ibeg, iend-ibeg)
+         + fNfill;
 }
 
 //_____________________________________________________________________________
