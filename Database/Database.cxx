@@ -466,22 +466,6 @@ Int_t IsDBkey( const string& line, const string& key, string& text )
 }
 
 //_____________________________________________________________________________
-Int_t ChopPrefix( string& s )
-{
-  // Remove trailing level from prefix. Example "L.vdc." -> "L."
-  // Return remaining number of dots, or zero if empty/invalid prefix
-
-  if( auto len = s.size(); len >= 2 ) {
-    if( auto pos = s.rfind('.', len-2); pos != string::npos ) {
-      s.erase(pos + 1);
-      return ToInt(ranges::count(s, '.'));
-    }
-  }
-  s.clear();
-  return 0;
-}
-
-//_____________________________________________________________________________
 bool IsTag( const char* buf )
 {
   // Return true if the string in 'buf' matches regexp ".*\[.+\].*",
@@ -582,6 +566,22 @@ void prepare_line( string& linbuf, bool& comment, bool& continued,
 }
 
 } // end anonymous namespace
+
+//_____________________________________________________________________________
+Int_t ChopPrefix( string& s )
+{
+  // Remove trailing level from prefix. Example "L.vdc." -> "L."
+  // Return remaining number of dots, or zero if empty/invalid prefix
+
+  if( auto len = s.size(); len >= 2 ) {
+    if( auto pos = s.rfind('.', len-2); pos != string::npos ) {
+      s.erase(pos + 1);
+      return ToInt(ranges::count(s, '.'));
+    }
+  }
+  s.clear();
+  return 0;
+}
 
 //_____________________________________________________________________________
 Int_t ReadDBline( FILE* file, char* buf, Int_t bufsiz, string& line )
