@@ -96,7 +96,7 @@ protected:
     bool   MatchesAll() const { return ipick == kAll && ibank <= 0; }
     bool   Match( const Decoder::GenScaler* scaler ) const;
 
-    UInt_t     size;   // Number of array elements FIXME do we need Int_t for ROOT?
+    UInt_t     size;   // Number of array elements
     Int_t      ibank;  // Bank number to select (-1: ignore)
     EPick      ipick;  // What to pick (entire slot, entire crate, all crates)
     std::vector<UInt_t> idxlist;  // scaler modules to use
@@ -135,7 +135,7 @@ protected:
   Int_t   AssignNormScaler();
   EStatus DefVars();
   decltype(fScalers)::iterator FindScaler(UInt_t icrate, UInt_t islot);
-  TBranch* MakeBranch( const std::string& name, THaVar* var ) const;
+  TBranch* MakeBranch( const std::string& name, const THaVar* var ) const;
   void    ParseMap( const std::vector<std::string>& words );
   void    ParseClock( const std::vector<std::string>& words );
   void    ParseVariable( const std::vector<std::string>& words );

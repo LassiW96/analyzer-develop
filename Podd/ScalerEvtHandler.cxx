@@ -120,7 +120,7 @@ Int_t ScalerEvtHandler::Analyze(THaEvData *evdata)
 }
 
 //_____________________________________________________________________________
-TBranch* ScalerEvtHandler::MakeBranch( const string& name, THaVar* var ) const
+TBranch* ScalerEvtHandler::MakeBranch( const string& name, const THaVar* var ) const
 {
   // Build the ROOT tree leaf description: varname/type or varname[size]/type
   string tinfo = name;
@@ -167,10 +167,12 @@ Int_t ScalerEvtHandler::Begin( THaRunBase* r )
 
     for( const auto& var: fScalarVars ) {
       assert(var.var); // else bug in DefVars
+      assert(&var.count == var.var->GetDataPointer());
       MakeBranch(var.name, var.var);
     }
     for( const auto& arr: fArrayVars ) {
       assert(arr.var); // else bug in DefVars
+      assert(arr.pCount == arr.var->GetDataPointer());
       MakeBranch(arr.name, arr.var);
     }
     //TODO chan, slot, crate branches. In separate tree with just one "event"?
@@ -895,15 +897,19 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
     string auxname, auxdesc;
     switch( sarr.ipick ) {
       case kAll:
+        assert(sarr.pCrate);
         auxname = varname + "crate"; auxname += subscript;
         auxdesc = vardesc + "(crate number)";
         gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pCrate);
+        [[fallthrough]];
       case kCrate:
+        assert(sarr.pSlot);
         auxname = varname + "slot"; auxname += subscript;
         auxdesc = vardesc + "(slot number)";
         gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pSlot);
         [[fallthrough]];
       case kSlot:
+        assert(sarr.pChan);
         auxname = varname + "chan"; auxname += subscript;
         auxdesc = vardesc + "(channel number)";
         gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pChan);
@@ -1074,9 +1080,9 @@ void ScalerEvtHandler::ArrayVariable::Deallocate()
     delete [] pRate;
   }
   pCount = nullptr;
-  delete [] pChan;  pChan = nullptr;
-  delete [] pSlot;  pSlot = nullptr;
   delete [] pCrate; pCrate = nullptr;
+  delete [] pSlot;  pSlot = nullptr;
+  delete [] pChan;  pChan = nullptr;
 }
 
 //_____________________________________________________________________________
