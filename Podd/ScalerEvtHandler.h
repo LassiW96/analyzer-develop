@@ -84,18 +84,11 @@ protected:
   };
   struct ArrayVariable : Variable {
     ArrayVariable( const std::string& nm, const std::string& desc,
-                 UInt_t cr, UInt_t sl, EKind kind, Int_t bank, EPick pick )
-      : Variable( nm, desc, cr, sl, kind )
-      , size(0)  // set later
-      , ibank(bank)
-      , ipick(pick)
-      , pCount(nullptr)
-      , pChan(nullptr)
-      , pSlot(nullptr)
-      , pCrate(nullptr)
-    {}
-    // TODO copy/move. This actually may matter since these are in an array
-    // TODO where they may be moved/copied around
+                 UInt_t cr, UInt_t sl, EKind kind, Int_t bank, EPick pick );
+    ArrayVariable( const ArrayVariable& rhs ) = delete; // not needed
+    ArrayVariable( ArrayVariable&& rhs ) noexcept;
+    ArrayVariable& operator=( const ArrayVariable& rhs ) = delete;
+    ArrayVariable& operator=( ArrayVariable&& other ) noexcept;
     ~ArrayVariable() { Deallocate();  }
     void   Allocate( UInt_t numchan );
     UInt_t Fill( UInt_t pos, const Decoder::GenScaler* scaler ) const;

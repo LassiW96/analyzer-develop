@@ -136,7 +136,7 @@ TBranch* ScalerEvtHandler::MakeBranch( const string& name, THaVar* var ) const
   // Add a branch for this variable to the tree
   // ROOT really wants a non-const pointer to the data ... pray and hope
   auto* branch = fScalerTree->Branch(
-    name.c_str(), const_cast<void*>(var->GetValuePointer()), tinfo.c_str());
+    name.c_str(), const_cast<void*>(var->GetDataPointer()), tinfo.c_str());
   if( !branch )
     Warning("Begin", "Cannot create tree branch \"%s\". "
             "Should never happen. Call expert.", name.c_str());
@@ -953,6 +953,62 @@ void ScalerEvtHandler::ScalarVariable::Fill( const GenScaler* scaler )
 }
 
 //_____________________________________________________________________________
+ScalerEvtHandler::ArrayVariable::ArrayVariable(
+      const std::string& nm, const std::string& desc, UInt_t cr, UInt_t sl,
+      EKind kind, Int_t bank, EPick pick )
+  : Variable( nm, desc, cr, sl, kind )
+  , size(0)  // set later
+  , ibank(bank)
+  , ipick(pick)
+  , pCount(nullptr)
+  , pChan(nullptr)
+  , pSlot(nullptr)
+  , pCrate(nullptr)
+{}
+
+// We have to implement these move operations to be able to use ArrayVariable
+// objects in a std::vector
+//_____________________________________________________________________________
+ScalerEvtHandler::ArrayVariable::ArrayVariable( ArrayVariable&& rhs ) noexcept
+  : Variable(std::move(static_cast<Variable&&>(rhs))) // intentionally slices
+  , size(rhs.size)
+  , ibank(rhs.ibank)
+  , ipick(rhs.ipick)
+  , idxlist(std::move(rhs.idxlist))
+  , pCount(rhs.pCount)
+  , pChan(rhs.pChan)
+  , pSlot(rhs.pSlot)
+  , pCrate(rhs.pCrate)
+{
+  rhs.pCount = nullptr;
+  rhs.pChan = nullptr;
+  rhs.pSlot = nullptr;
+  rhs.pCrate = nullptr;
+}
+
+//_____________________________________________________________________________
+ScalerEvtHandler::ArrayVariable&
+  ScalerEvtHandler::ArrayVariable::operator=( ArrayVariable&& rhs ) noexcept
+{
+  if( this == &rhs )
+    return *this;
+  Variable::operator=(static_cast<Variable&&>(rhs)); // intentionally slices
+  size = rhs.size;
+  ibank = rhs.ibank;
+  ipick = rhs.ipick;
+  idxlist = std::move(rhs.idxlist);
+  pCount = rhs.pCount;
+  pChan = rhs.pChan;
+  pSlot = rhs.pSlot;
+  pCrate = rhs.pCrate;
+  rhs.pCount = nullptr;
+  rhs.pChan = nullptr;
+  rhs.pSlot = nullptr;
+  rhs.pCrate = nullptr;
+  return *this;
+}
+
+//_____________________________________________________________________________
 bool ScalerEvtHandler::ArrayVariable::Match( const GenScaler* scaler ) const
 {
   // Check if this array variable is associated with the given scaler
@@ -1042,8 +1098,8 @@ UInt_t ScalerEvtHandler::ArrayVariable::Fill( UInt_t pos,
     const auto& rates = scaler->GetRates();
     if( rates.size() != nchan )
       throw logic_error("Unexpected scaler rates array size mismatch");
-    for( auto r: rates )
-      pRate[pos + nchan] = static_cast<Float_t>(r);
+    for( UInt_t i = 0; i < nchan; i++ )
+      pRate[pos + i] = static_cast<Float_t>(rates[i]);
   }
   return pos + nchan;
 }
