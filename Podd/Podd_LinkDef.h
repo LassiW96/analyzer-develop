@@ -39,6 +39,7 @@
 #pragma link C++ class WordLoc+;
 #pragma link C++ class RoclenLoc+;
 #pragma link C++ class BankData+;
+#pragma link C++ class ScalerEvtHandler+;
 #pragma link C++ class THaAnalysisObject+;
 #pragma link C++ class THaDetectorBase+;
 #pragma link C++ class THaPhysicsModule+;
@@ -102,7 +103,6 @@
 #pragma link C++ class THaPhotoReaction+;
 #pragma link C++ class THaSAProtonEP+;
 #pragma link C++ class THaEvtTypeHandler+;
-#pragma link C++ class THaScalerEvtHandler+;
 #pragma link C++ class THaEpicsEvtHandler+;
 #pragma link C++ class THaEvt125Handler+;
 #pragma link C++ class Podd::MCHitInfo+;
