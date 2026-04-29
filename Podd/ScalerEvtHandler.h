@@ -22,6 +22,8 @@ class THaEvData;
 class THaVar;
 class TTree;
 
+namespace Podd {
+
 class ScalerEvtHandler : public THaEvtTypeHandler {
 
 public:
@@ -157,5 +159,7 @@ protected:
 
   ClassDefOverride(ScalerEvtHandler,0)  // Scaler Event handler
 };
+
+} // namespace Podd
 
 #endif

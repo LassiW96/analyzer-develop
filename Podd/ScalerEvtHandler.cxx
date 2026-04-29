@@ -65,6 +65,7 @@ namespace {
 constexpr UInt_t defaultDT = 4;
 }
 
+namespace Podd {
 //_____________________________________________________________________________
 ScalerEvtHandler::ScalerEvtHandler( const char* name,
                                           const char* description )
@@ -1171,7 +1172,9 @@ UInt_t ScalerEvtHandler::ArrayVariable::FillIndices( UInt_t pos,
   return pos + nchan;
 }
 
+} // namespace Podd
+
 //_____________________________________________________________________________
 #if ROOT_VERSION_CODE < ROOT_VERSION(6,36,0)
-ClassImp(THaScalerEvtHandler)
+ClassImp(Podd::ScalerEvtHandler)
 #endif

@@ -39,7 +39,6 @@
 #pragma link C++ class WordLoc+;
 #pragma link C++ class RoclenLoc+;
 #pragma link C++ class BankData+;
-#pragma link C++ class ScalerEvtHandler+;
 #pragma link C++ class THaAnalysisObject+;
 #pragma link C++ class THaDetectorBase+;
 #pragma link C++ class THaPhysicsModule+;
@@ -118,6 +117,7 @@
 #pragma link C++ class Podd::MultiFileRun+;
 #pragma link C++ class Podd::MultiFileRun::StreamInfo+;
 #pragma link C++ class Podd::MultiFileRun::FileInfo+;
+#pragma link C++ class Podd::ScalerEvtHandler+;
 #pragma link C++ class DAQInfoExtra+;
 #pragma link C++ class DAQconfig+;
 
