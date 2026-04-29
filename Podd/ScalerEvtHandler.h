@@ -38,6 +38,11 @@ public:
   Int_t   End( THaRunBase* r = nullptr ) override;
   EStatus Init( const TDatime& run_time ) override;
 
+  // Put array index arrays into a separate tree for smaller file size.
+  // The space savings will be minor if ROOT file compression is enabled,
+  // but throughput may improve due to fewer branches to be written/read.
+  void    EnableIndexTree( bool set = true ) { SetBit(kDoIndexTree, set); }
+
   enum EKind : Byte_t { kCount, kRate };
   enum EPick : Byte_t { kSlot, kCrate, kAll };
 
@@ -99,7 +104,8 @@ protected:
     UInt_t     size;   // Number of array elements
     Int_t      ibank;  // Bank number to select (-1: ignore)
     EPick      ipick;  // What to pick (entire slot, entire crate, all crates)
-    std::vector<UInt_t> idxlist;  // scaler modules to use
+    std::vector<UInt_t>  idxlist; // scaler modules to use
+    std::vector<THaVar*> idxvars; // variables for chan/slot/crate indices
     union {
       UInt_t*  pCount; // [size] Data: Raw memory blocks treated as fixed-size
       Float_t* pRate;  // arrays, ROOT's favorite data structure for such things
@@ -119,13 +125,17 @@ protected:
     Double_t freq;
   };
 
+  // Status bits
+  enum EConfigFlags { kDoIndexTree = BIT(16) }; // NOLINT(*-enum-size)
+
   std::vector<std::unique_ptr<Decoder::GenScaler>> fScalers;
   std::vector<ClockDef> fClocks;
   std::vector<ScalarVariable> fScalarVars;
   std::vector<ArrayVariable> fArrayVars;
   ULong64_t fEvtCount;
   ULong64_t fEvtNum;       // last seen physics event number
-  TTree*    fScalerTree;   // raw pointer since ROOT will own the tree
+  TTree*    fScalerTree;   // Scaler events. ROOT will own the tree
+  TTree*    fIndexTree;    // If arrays defined, variable indices may go here
   Double_t  fDeltaT;       // approximate time between scaler readings
 
   virtual Int_t Decode( THaEvData* evdata );
@@ -135,12 +145,15 @@ protected:
   Int_t   AssignNormScaler();
   EStatus DefVars();
   decltype(fScalers)::iterator FindScaler(UInt_t icrate, UInt_t islot);
-  TBranch* MakeBranch( const std::string& name, const THaVar* var ) const;
   void    ParseMap( const std::vector<std::string>& words );
   void    ParseClock( const std::vector<std::string>& words );
   void    ParseVariable( const std::vector<std::string>& words );
   Int_t   ReadDatabase( const TDatime& date ) override;
   void    SetIndices();
+
+  static TBranch* MakeBranch( const std::string& name, const THaVar* var,
+                              TTree* tree );
+  TBranch* MakeIndexBranch( const THaVar* var ) const;
 
   ClassDefOverride(ScalerEvtHandler,0)  // Scaler Event handler
 };

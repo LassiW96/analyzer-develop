@@ -43,7 +43,7 @@
 #include <cassert>              // for assert
 #include <cctype>               // for isalpha
 #include <cstdio>               // for size_t, fgets
-#include <cstring>              // for memcpy
+#include <cstring>              // for memcpy, strlen
 #include <exception>            // for exception
 #include <iterator>             // for distance
 #include <numeric>              // for iota
@@ -72,16 +72,21 @@ ScalerEvtHandler::ScalerEvtHandler( const char* name,
   , fEvtCount(0)
   , fEvtNum(0)
   , fScalerTree(nullptr)
+  , fIndexTree(nullptr)
   , fDeltaT(defaultDT)
-{}
+{
+  ResetBit(kDoIndexTree);
+}
 
 //_____________________________________________________________________________
 ScalerEvtHandler::~ScalerEvtHandler()
 {
   // The tree object is owned by ROOT since it gets associated wth the output
   // file, so DO NOT delete it here.
-  if (!TROOT::Initialized())
+  if (!TROOT::Initialized()) {
     delete fScalerTree;
+    delete fIndexTree;
+  }
 }
 
 //_____________________________________________________________________________
@@ -120,27 +125,37 @@ Int_t ScalerEvtHandler::Analyze(THaEvData *evdata)
 }
 
 //_____________________________________________________________________________
-TBranch* ScalerEvtHandler::MakeBranch( const string& name, const THaVar* var ) const
+TBranch* ScalerEvtHandler::MakeBranch( const string& name, const THaVar* var,
+                                       TTree* tree )
 {
   // Build the ROOT tree leaf description: varname/type or varname[size]/type
+  const char* const here = "ScalerEvtHandler::MakeBranch";
+
   string tinfo = name;
   if( var->IsArray()  )
     tinfo += '[' + to_string(var->GetLen() ) + ']';
-  auto vartype = var->GetType();
-  if( vartype == kUInt || vartype == kUIntP) {
-    tinfo += "/i"; // uint32_t
-  } else {
-    assert(vartype == kFloat || vartype == kFloatP);
-    tinfo += "/F"; // float
-  }
+  const char* btype = Vars::GetBranchTypeChar(var->GetType());
+  assert(btype && *btype);
+  tinfo += btype;
   // Add a branch for this variable to the tree
   // ROOT really wants a non-const pointer to the data ... pray and hope
-  auto* branch = fScalerTree->Branch(
+  auto* branch = tree->Branch(
     name.c_str(), const_cast<void*>(var->GetDataPointer()), tinfo.c_str());
   if( !branch )
-    Warning("Begin", "Cannot create tree branch \"%s\". "
-            "Should never happen. Call expert.", name.c_str());
+    ::Warning(here, "Cannot create tree branch \"%s\". "
+              "Should never happen. Call expert.", name.c_str());
   return branch;
+}
+
+//_____________________________________________________________________________
+TBranch* ScalerEvtHandler::MakeIndexBranch( const THaVar* tvar ) const
+{
+  if( !tvar )
+    return nullptr;
+  string name = tvar->GetName();
+  if( name.starts_with(GetPrefix()) )
+    name.erase(0, strlen(GetPrefix()));
+  return MakeBranch(name, tvar, fIndexTree ? fIndexTree : fScalerTree);
 }
 
 //_____________________________________________________________________________
@@ -168,15 +183,31 @@ Int_t ScalerEvtHandler::Begin( THaRunBase* r )
     for( const auto& var: fScalarVars ) {
       assert(var.var); // else bug in DefVars
       assert(&var.count == var.var->GetDataPointer());
-      MakeBranch(var.name, var.var);
+      MakeBranch(var.name, var.var, fScalerTree);
     }
     for( const auto& arr: fArrayVars ) {
       assert(arr.var); // else bug in DefVars
       assert(arr.pCount == arr.var->GetDataPointer());
-      MakeBranch(arr.name, arr.var);
+      MakeBranch(arr.name, arr.var, fScalerTree);
     }
-    //TODO chan, slot, crate branches. In separate tree with just one "event"?
   }
+
+  // If we have arrays, save corresponding channel, slot, and crate indices,
+  // as applicable in the scaler tree. If a separate "index tree" is explictly
+  // requested, use that tree instead. The tree has just a single entry, which
+  // saves space since the indices never change after initial setup.
+  if( !fArrayVars.empty() && TestBit(kDoIndexTree) ) {
+    TString tree_name = "TI" + fName;
+    TString tree_desc = fName + " array variable indices";
+    fIndexTree = new TTree(tree_name,tree_desc);
+  }
+  for( const auto& arr: fArrayVars ) {
+    for( auto* tvar: arr.idxvars )
+      MakeIndexBranch(tvar);
+  }
+  if( fIndexTree )
+    fIndexTree->Fill();
+
   return ret;
 }
 
@@ -194,6 +225,8 @@ Int_t ScalerEvtHandler::End( THaRunBase* r )
 {
   if( fScalerTree )
     fScalerTree->Write();
+  if( fIndexTree )
+    fIndexTree->Write();
 
   return THaEvtTypeHandler::End(r);
 }
@@ -209,7 +242,7 @@ GenScaler* MakeScaler( Int_t model )
 
   // FIXME avoid code duplication -> move this to the decoder
 
-  const char* const here = "THaScalerEvtHandler::MakeScaler";
+  const char* const here = "ScalerEvtHandler::MakeScaler";
 
   auto& moduletypes = Module::fgModuleTypes();
   auto found = moduletypes.find(model);
@@ -236,7 +269,7 @@ GenScaler* MakeScaler( Int_t model )
       Error(here, "Class %s does not inherit from %s. "
             "Coding error. Call expert.", modtype.fClassName, kBaseClassName);
       return nullptr;
-    }
+        }
   }
   assert( modtype.fTClass );
 
@@ -245,7 +278,7 @@ GenScaler* MakeScaler( Int_t model )
   if( !module ) {
     Error( here, "Failed to make Module %s. Coding error. Call expert.",
            modtype.fClassName );
-      return nullptr;
+    return nullptr;
   }
 
   // Initialize the module
@@ -866,8 +899,8 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
   for( auto& sarr: fArrayVars) {
     assert(sarr.size > 0 );   // else bug in SetIndices()
     // The size of the array variables is fixed; it is set once at Init() time
+    const string subscript = '[' + to_string(sarr.size) + ']';
     string varname = GetPrefix() + sarr.name;
-    string subscript = '[' + to_string(sarr.size) + ']';
     string arrname = varname + subscript;
     switch( sarr.ikind ) {
       case kCount:
@@ -880,14 +913,14 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
         break;
     }
     // Define chan, slot, crate variables. These currently hold constant data
-    // that never change from event to event, which wastes a lot of space, but
+    // that never change from event to event, which wastes space, but
     // they are the most convenient way to recover the source of the scaler
-    // info from the parallel .count and/or .rate arrays.
+    // info from the .count and/or .rate arrays.
     // On the other hand, ROOT file compression will be very effective on
     // corresponding branches.
-    // TODO can these arrays be written just once in some kind of header?
 
-    // Drop trailing ".count" or ".rate" in name
+    // Drop trailing ".count" or ".rate" in name. ".chan", ".slot", and ".crate"
+    // will be added below.
     ChopPrefix( varname);
     // Similarly, drop trailing "(count)" or "(rate)" in description
     string vardesc{sarr.description};
@@ -895,24 +928,30 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
     if( pos != string::npos )
       vardesc.erase(pos);
     string auxname, auxdesc;
+    THaVar* var;
+    sarr.idxvars.clear();
+    sarr.idxvars.reserve(sarr.ipick + 1);
     switch( sarr.ipick ) {
       case kAll:
         assert(sarr.pCrate);
         auxname = varname + "crate"; auxname += subscript;
         auxdesc = vardesc + "(crate number)";
-        gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pCrate);
+        var = gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pCrate);
+        sarr.idxvars.push_back(var);
         [[fallthrough]];
       case kCrate:
         assert(sarr.pSlot);
         auxname = varname + "slot"; auxname += subscript;
         auxdesc = vardesc + "(slot number)";
-        gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pSlot);
+        var = gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pSlot);
+        sarr.idxvars.push_back(var);
         [[fallthrough]];
       case kSlot:
         assert(sarr.pChan);
         auxname = varname + "chan"; auxname += subscript;
         auxdesc = vardesc + "(channel number)";
-        gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pChan);
+        var = gHaVars->Define(auxname.c_str(), auxdesc.c_str(), sarr.pChan);
+        sarr.idxvars.push_back(var);
         break;
     }
   }
@@ -981,6 +1020,7 @@ ScalerEvtHandler::ArrayVariable::ArrayVariable( ArrayVariable&& rhs ) noexcept
   , ibank(rhs.ibank)
   , ipick(rhs.ipick)
   , idxlist(std::move(rhs.idxlist))
+  , idxvars(std::move(rhs.idxvars))
   , pCount(rhs.pCount)
   , pChan(rhs.pChan)
   , pSlot(rhs.pSlot)
@@ -1003,6 +1043,7 @@ ScalerEvtHandler::ArrayVariable&
   ibank = rhs.ibank;
   ipick = rhs.ipick;
   idxlist = std::move(rhs.idxlist);
+  idxvars = std::move(rhs.idxvars);
   pCount = rhs.pCount;
   pChan = rhs.pChan;
   pSlot = rhs.pSlot;
