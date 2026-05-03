@@ -144,9 +144,9 @@ protected:
   virtual Int_t DecodeBank( Decoder::CodaDecoder* codaevent, Decoder::GenScaler* scaler );
   virtual Int_t DecodeRoc( THaEvData* evdata, Decoder::GenScaler* scaler );
 
-  Int_t   AssignNormScaler();
+  Int_t   AssignNormScaler() const;
   EStatus DefVars();
-  decltype(fScalers)::iterator FindScaler(UInt_t icrate, UInt_t islot);
+  decltype(fScalers)::const_iterator FindScaler(UInt_t icrate, UInt_t islot) const;
   void    ParseMap( const std::vector<std::string>& words );
   void    ParseClock( const std::vector<std::string>& words );
   void    ParseVariable( const std::vector<std::string>& words );

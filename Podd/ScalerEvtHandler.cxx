@@ -574,7 +574,7 @@ void ScalerEvtHandler::ParseVariable( const vector<string>& words )
 }
 
 //_____________________________________________________________________________
-Int_t ScalerEvtHandler::AssignNormScaler()
+Int_t ScalerEvtHandler::AssignNormScaler() const
 {
   const char* const here = "AssignNormScaler";
 
@@ -585,7 +585,7 @@ Int_t ScalerEvtHandler::AssignNormScaler()
   }
   bool multi_clocks = fClocks.size() > 1;
   // Connect scalers to clock(s)
-  for( auto& scaler : fScalers ) {
+  for( const auto& scaler : fScalers ) {
     UInt_t clkidx;
     Int_t clkref = scaler->GetMode();
     if( clkref < 0 ) {
@@ -597,7 +597,7 @@ Int_t ScalerEvtHandler::AssignNormScaler()
       }
       clkidx = 0;
     } else {
-      auto iclock = ranges::find_if(fClocks, [clkref]( const auto& c )
+      const auto& iclock = ranges::find_if(fClocks, [clkref]( const auto& c )
         { return c.iref == clkref; });
       if( iclock == fClocks.end() ) {
         Error(here, "Clock reference %d for scaler in crate/slot %u/%u does "
@@ -960,8 +960,8 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
 }
 
 //_____________________________________________________________________________
-decltype(ScalerEvtHandler::fScalers)::iterator
-ScalerEvtHandler::FindScaler( UInt_t icrate, UInt_t islot )
+decltype(ScalerEvtHandler::fScalers)::const_iterator
+ScalerEvtHandler::FindScaler( UInt_t icrate, UInt_t islot ) const
 {
   return ranges::find_if(fScalers, [icrate,islot]( const auto& s ) {
     return s->GetCrate() == icrate && s->GetSlot() == islot;
