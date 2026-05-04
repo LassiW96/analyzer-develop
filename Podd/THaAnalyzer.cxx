@@ -68,7 +68,7 @@ THaAnalyzer* THaAnalyzer::fgAnalyzer = nullptr;
 //_____________________________________________________________________________
 // Convert from type-unsafe ROOT containers to STL vectors
 template<typename T>
-inline size_t ListToVector( TList* lst, vector<T*>& vec )
+size_t ListToVector( TList* lst, vector<T*>& vec )
 {
   if( lst ) {
     vec.reserve(std::max(lst->GetSize(), 0));
@@ -111,11 +111,12 @@ size_t RemoveExternals( vector<T*>& vec, TList* lst )
 
 //_____________________________________________________________________________
 namespace {
-inline string CurrentTime()
+// ReSharper disable once CppDFAConstantFunctionResult
+string CurrentTime()
 {
   string timestr{"(unknown time}"};
   time_t tloc = time(nullptr);
-  struct tm tmc{};
+  tm tmc{};
   localtime_r(&tloc, &tmc);
   char buff[32];
   auto c = strftime(buff, 32, "%Y-%m-%d %H:%M:%S %z", &tmc);
@@ -197,7 +198,7 @@ THaAnalyzer::~THaAnalyzer()
 }
 
 //_____________________________________________________________________________
-Int_t THaAnalyzer::AddInterStage( Podd::InterStageModule* module )
+Int_t THaAnalyzer::AddInterStage( InterStageModule* module )
 {
   // Add 'module' to the list of inter-stage modules. See AddPostProcess()
   // for additional comments
