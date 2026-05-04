@@ -148,17 +148,17 @@ Int_t THaRun::Compare( const TObject* obj ) const
   // -1 when 'this' is smaller and +1 when bigger (like strcmp).
   // Used by ROOT containers.
 
-  if (this == obj) return 0;
+  if (this == obj)                return 0;
   const auto* rhs = dynamic_cast<const THaRunBase*>(obj);
-  if( !rhs ) return -1;
-  if( *this < *rhs )       return -1;
-  else if( *rhs < *this )  return  1;
+  if( !rhs )                      return -1;
+  if( *this < *rhs )              return -1;
+  if( *rhs < *this )              return  1;
   const auto* rhsr = dynamic_cast<const THaRun*>(rhs);
-  if( !rhsr ) return 0;
+  if( !rhsr )                     return 0;
   if( fSegment < rhsr->fSegment ) return -1;
-  else if( rhsr->fSegment < fSegment ) return 1;
-  if( fStream < rhsr->fStream ) return -1;
-  else if( rhsr->fStream < fStream ) return 1;
+  if( rhsr->fSegment < fSegment ) return  1;
+  if( fStream < rhsr->fStream )   return -1;
+  if( rhsr->fStream < fStream )   return  1;
   return 0;
 }
 

@@ -111,12 +111,12 @@ THaVar::THaVar( const char* name, const char* descript, const void* obj,
     MakeZombie();
     return;
   }
-  else if( type >= kIntM && type <= kDoubleM ) {
+  if( type >= kIntM && type <= kDoubleM ) {
     Error( here, "Variable %s: Matrix types not (yet) supported", name );
     MakeZombie();
     return;
   }
-  else if( type >= kIntV && type <= kDoubleV ) {
+  if( type >= kIntV && type <= kDoubleV ) {
     if( count ) {
       Warning( here, "Ignoring size counter for std::vector variable %s. "
 	       "Fix code or call expert", name );
@@ -170,7 +170,7 @@ THaVar::THaVar( const char* name, const char* descript, const void* obj,
     MakeZombie();
     return;
   }
-  else if( elem_size < 0 || offset < 0 ) {
+  if( elem_size < 0 || offset < 0 ) {
     Error( here, "Variable %s: Illegal parameters elem_size = %d, "
 	   "offset = %d. Must be >= 0", name, elem_size, offset );
     MakeZombie();

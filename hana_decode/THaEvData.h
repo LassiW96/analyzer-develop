@@ -313,7 +313,11 @@ inline UInt_t THaEvData::GetRawData( UInt_t crate, UInt_t slot, UInt_t chan,
 
 inline UInt_t THaEvData::GetRawData( UInt_t i ) const {
   // Raw words in evbuffer at location #i.
-  assert( buffer && i < GetEvLength() );
+  assert( buffer );
+  assert( i < GetEvLength() );
+#ifdef NDEBUG
+  if( !buffer || i >= GetEvLength() ) return 0;
+#endif
   return buffer[i];
 }
 
@@ -469,9 +473,8 @@ UInt_t THaEvData::GetNumEvents( Decoder::EModuleDataType type, UInt_t crate, UIn
   if( !module ) return 0;
   if( module->HasCapability(type) ) {
     return module->GetNumEvents(type, chan);
-  } else {
-    return GetNumHits(crate, slot, chan);
   }
+  return GetNumHits(crate, slot, chan);
 }
 
 inline
@@ -481,9 +484,8 @@ UInt_t THaEvData::GetData( Decoder::EModuleDataType type, UInt_t crate, UInt_t s
   if( module->HasCapability(type) ) {
     if( hit >= module->GetNumEvents(type, chan) ) return 0;
     return module->GetData(type, chan, hit);
-  } else {
-    return GetData(crate, slot, chan, hit);
   }
+  return GetData(crate, slot, chan, hit);
 }
 
 inline

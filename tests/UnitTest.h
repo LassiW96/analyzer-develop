@@ -19,9 +19,9 @@ public:
 
 protected:
   // By default, let unit tests not bother with the run database
-  virtual Int_t  ReadRunDatabase( const TDatime& ) { return kOK; }
+  Int_t  ReadRunDatabase( const TDatime& ) override { return kOK; }
 
-  ClassDef(UnitTest,1)
+  ClassDefOverride(UnitTest,1)
 };
 
 } // namespace Podd::Tests
