@@ -284,13 +284,13 @@ void THaEvData::SetCrateMapName( const char* name )
 }
 
 //_____________________________________________________________________________
-TString THaEvData::GetCrateMapName() const
+const TString& THaEvData::GetCrateMapName() const
 {
   return fCrateMapName.IsNull() ? fgDefaultCrateMapName : fCrateMapName;
 }
 
 //_____________________________________________________________________________
-TString THaEvData::GetDefaultCrateMapName()
+const TString& THaEvData::GetDefaultCrateMapName()
 {
   return fgDefaultCrateMapName;
 }

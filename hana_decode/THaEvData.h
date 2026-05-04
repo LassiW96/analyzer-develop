@@ -160,9 +160,9 @@ public:
   static void hexdump(const char* cbuff, size_t len);
 
   void SetCrateMapName( const char* name );
+  const TString& GetCrateMapName() const;
   static void SetDefaultCrateMapName( const char* name );
-  TString GetCrateMapName() const;
-  static TString GetDefaultCrateMapName();
+  static const TString& GetDefaultCrateMapName();
 
   virtual void SetRunInfo( UInt_t num, UInt_t type, Long64_t tloc );
 
