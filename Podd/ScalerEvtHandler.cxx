@@ -1,35 +1,83 @@
+//*-- Author :    Ole Hansen   19-Apr-2026
+
 ///////////////////////////////////////////////////////////////////////////////
 //
-//   THaScalerEvtHandler
+//   Podd::ScalerEvtHandler
 //
-//   Event handler for Hall A scalers.
-//   R. Michaels,  Sept, 2014
+//   Handler for scaler events. Also handles scaler data in physics events.
 //
-//   This class does the following
-//      For a particular set of event types (here, event type 140)
-//      decode the scalers and put some variables into global variables.
-//      The global variables can then appear in the Podd output tree T.
-//      In addition, a tree "TS" is created by this class; it contains
-//      just the scaler data by itself.  Note, the "fName" is concatenated
-//      with "TS" to ensure the tree is unique; further, "fName" is
-//      concatenated with the name of the global variables, for uniqueness.
-//      The list of global variables and how they are tied to the
-//      scaler module and channels is in the scaler.map file, or could
-//      be hardcoded here.
-//      NOTE: if you don't have the scaler map file (e.g. db_LeftScalevt.dat)
-//      there will be no variable output to the Trees.
+//   This class analyzes both user events with scaler data (event type 140 in
+//   Hall A) and physics events. Physics events may have bank structure
+//   (preferred) or the traditional ROC structure. It identifies those scaler
+//   modules that are defined in the database for this object, extracts the raw
+//   count of each channel, and calculates the rate in each channel using
+//   a clock (normalization) channel that is assumed to count at a constant,
+//   known rate. Multiple clock channels may be defined.
 //
-//   To use in the analyzer, your setup script needs something like this
-//       gHaEvtHandlers->Add (new THaScalerEvtHandler("Left","HA scaler event type 140"));
+//   The results are exported to global variables, which also are defined in
+//   the database. Variables can represent a single scaler channel, all
+//   channels in a module (slot), all scalers defined for a crate, all
+//   scaler data in a bank, or all scalers defined in the database.
+//   Variable names are defined in the database. As usual, names are prefixed
+//   with the name of this object. Variables representing counts are suffixed
+//   with ".count", and those representing rates, with ".rate". For variables
+//   representing more than one channel (array variables), parallel array
+//   variables (index variables) are created with suffixes ".chan", ".slot", and
+//   ".crate", as needed to identify the data unambiguously.
+//
+//   Variables may be written to the physics tree by adding corresponding
+//   definitions in the analyzer .odef file. Additionally, this class creates
+//   a separate "scaler tree" named "TS<name>", where <name> is the name of this
+//   object (the prefix without the trailing dot). The names of the variables in
+//   the scaler tree do not get the object prefix. For example, say the database
+//   defines a variable "s1p1r" (scintillator 1 paddle 1 right) representing the
+//   rate, and this object is named "Left", then there will be a global variable
+//   "Left.s1p1r.rate" available for general analysis, and a scaler tree
+//   "TSLeft", where this variable appears as "s1p1r.rate".
+//
+//   The scaler tree is always created by this class. It is filled whenever data
+//   for the defined scalers is encountered in an event. Typically, every user
+//   event has such data. Physics events may or may not have scaler data,
+//   depending on the configuration of the DAQ. If scaler variables are being
+//   written to the physics tree also, their data usually only change
+//   infrequently, whenever new scaler readings are injected.
+//   To help with synchronization, the scaler tree also contains the current
+//   (last encountered) physics event number.
+//
+//   For array variables, the special parallel index arrays are also written to
+//   the scaler tree by default. Since the index data never change (they are
+//   part of the variable definition), this wastes space; however, with ROOT
+//   file compression enabled, these branches compress very well. If it is
+//   preferred, the user may enable a special "index tree", named "TI<name>",
+//   that holds all index variables and contains exactly one row, written at
+//   the start of the analysis. This saves space at the expense of a more
+//   complex analysis since variables in the index tree cannot be plotted
+//   directly against variables in the scaler or physics tree.
+//
+//   Usage example:
+//
+//   // Create new scaler event handler. Its database is "db_Left.dat".
+//   auto* scalerhandler = new Podd::ScalerEvtHandler("Left", "Left arm scalers");
+//
+//   // Enable the special index tree (not necessarily recommended)
+//   scalerhandler->EnableIndexTree();
+//
+//   // Add handler to the analyzer for processing. The analyzer becomes the
+//   // "owner" of the scalerhandler object; do not delete it yourself.
+//   analyzer->AddEvtHandler(scalerhandler);
+//
+//   Example database with documentation:  tests/DB/db_FadcScal.dat
+//
+//   Based on THaScalerEvtHandler by R. Michaels, Sept, 2014.
 //
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "ScalerEvtHandler.h"
 #include "CodaDecoder.h"        // for CodaDecoder, THaEvData, coda_format_error
-#include "Database.h"           // for CFile, VarType, ChopPrefix
+#include "Database.h"           // for CFile, ChopPrefix, GetBranchTypeChar
 #include "Module.h"             // for Module
 #include "TClass.h"             // for TClass
-#include "TError.h"             // for Error
+#include "TError.h"             // for Error, Warning
 #include "THaAnalysisObject.h"  // for THaAnalysisObject
 #include "THaCrateMap.h"        // for THaCrateMap
 #include "THaGlobals.h"         // for gHaVars
@@ -86,8 +134,8 @@ ScalerEvtHandler::~ScalerEvtHandler()
   RemoveVariables();
 
   // The tree object is owned by ROOT since it gets associated wth the output
-  // file, so DO NOT delete it here.
-  if (!TROOT::Initialized()) {
+  // file, so DO NOT delete it here, unless we're not under ROOT
+  if (!TROOT::Initialized()) { // TODO can this ever be true?
     delete fScalerTree;
     delete fIndexTree;
   }
@@ -102,7 +150,6 @@ Int_t ScalerEvtHandler::Analyze(THaEvData *evdata)
   Clear();
 
   // Parse the data, load local data arrays.
-
   if( Int_t ret = Decode(evdata); ret <= 0 )
     return ret;
 
@@ -207,6 +254,7 @@ Int_t ScalerEvtHandler::Begin( THaRunBase* r )
   }
   for( const auto& arr: fArrayVars ) {
     for( auto* tvar: arr.idxvars )
+      // ReSharper disable once CppExpressionWithoutSideEffects // false positive
       MakeIndexBranch(tvar);
   }
   if( fIndexTree )
@@ -307,8 +355,6 @@ void ScalerEvtHandler::ParseMap( const vector<string>& words )
   // to be identified by traditional header word matching (key = "map") or
   // through bank decoding (key = "bank").
 
-  const char* const here = "ParseMap";
-
   if( words.size() < 5 )
     return;
   const auto& key = words[0];
@@ -357,6 +403,7 @@ void ScalerEvtHandler::ParseMap( const vector<string>& words )
   }
   // Check for duplicates - each crate/slot can only be assigned one module
   if( FindScaler(icrate, islot) != fScalers.end() ) {
+    const char* const here = "ParseMap";
     Error(here, "Duplicate scaler definition \"%s %u %u %d\". "
           "Crate/slot must be unique. Ignoring line.",
           words[0].c_str(), icrate, islot, imodel);
@@ -545,6 +592,7 @@ void ScalerEvtHandler::ParseVariable( const vector<string>& words )
   string vardesc(GetName());
   for( size_t j = nameidx + 1; j < words.size(); j++ )
     vardesc += " " + words[j];
+
   // Determine whether this variable reports raw counts, the rate, or both.
   // ".count" and ".rate" will be appended to the variable name, as applicable.
   bool count_mode = imode && (imode.value() == 0 || imode.value() == 1);
@@ -579,6 +627,9 @@ void ScalerEvtHandler::ParseVariable( const vector<string>& words )
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus ScalerEvtHandler::AssignNormScaler() const
 {
+  // Tell each defined scaler module which clock to use, based on the
+  // specifications in the database
+
   const char* const here = "AssignNormScaler";
 
   //TODO allow running without a clock, just estimate rates with deltaT
