@@ -82,6 +82,27 @@ ScalerEvtHandler::ScalerEvtHandler( const char* name,
 //_____________________________________________________________________________
 ScalerEvtHandler::~ScalerEvtHandler()
 {
+  // Remove all global variables we created
+  for( auto& svar: fScalarVars ) {
+    if( THaVar* pvar = svar.var ) {
+      gHaVars->Remove(pvar);
+      delete pvar;
+      svar.var = nullptr;
+    }
+  }
+  for( auto& sarr: fArrayVars ) {
+    if( THaVar* pvar = sarr.var ) {
+      gHaVars->Remove(pvar);
+      delete pvar;
+      sarr.var = nullptr;
+    }
+    for( THaVar* pvar: sarr.idxvars ) {
+      if( pvar )
+        gHaVars->Remove(pvar);
+    }
+    DeleteContainer(sarr.idxvars);
+  }
+
   // The tree object is owned by ROOT since it gets associated wth the output
   // file, so DO NOT delete it here.
   if (!TROOT::Initialized()) {
