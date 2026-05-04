@@ -18,10 +18,12 @@
 /////////////////////////////////////////////////////////////////////
 
 #include "Decoder.h"      // for Rtypes, BIT, ECrateCode, EModuleType, kMaxUInt, ClassDefNV
+#include "Module.h"       // for Decoder::Module
 #include <array>          // for array
 #include <cstdio>         // for FILE, size_t
 #include <iostream>       // for ostream, cout
 #include <map>            // for map
+#include <memory>         // for unique_ptr
 #include <set>            // for set
 #include <string>         // for string
 #include <unordered_map>  // for unordered_map, operator==
@@ -68,6 +70,7 @@ public:
   UInt_t getNchan( UInt_t crate, UInt_t slot ) const;  // Max number of channels
   [[deprecated("Ndata is automatically adjusted internally. User code should ignore this value.")]]
   UInt_t getNdata( UInt_t, UInt_t ) const { return MAXDATA; };  // Max number of data words NOLINT(*-convert-member-functions-to-static)
+  Module* GetModule(UInt_t crate, UInt_t slot );       // Get decoder module for crate/slot
   bool   crateUsed( UInt_t crate ) const;              // True if crate is used
   bool   slotUsed( UInt_t crate, UInt_t slot ) const;  // True if slot in crate is used
   bool   slotClear( UInt_t crate, UInt_t slot ) const; // Decide if not clear ea event
@@ -84,6 +87,8 @@ public:
   enum ECrateMapDebug : Byte_t { kAllowMissingModel = BIT(6) };
 
 private:
+  using ModulePtr = std::unique_ptr<Module>;
+
   std::string fDBfileName;     // Database file name
   Long64_t    fInitTime;       // Database time stamp (Unix time)
   UInt_t      fTSROC;          // Crate (aka ROC) of the trigger supervisor
@@ -92,26 +97,24 @@ private:
   bool        fDoReset;        // Clear map at new timestamps
   Byte_t      fDebug;          // Enable debugging (bitmask)
 
-  class SlotInfo_t {
-  public:
-    SlotInfo_t() : model(0), header(0), headmask(0xffffffff), bank(-1),
-      nchan(0), slot(0), do_clear(true), type(EModuleType::kUndefined) {}
-    Int_t    model;
-    UInt_t   header;
-    UInt_t   headmask;
-    Int_t    bank;
-    UShort_t nchan;
-    UShort_t slot;     // self-reference, redundant but sometimes useful
-    bool     do_clear;
-    EModuleType type;
-    std::string cfgstr;
+  struct SlotInfo_t {
+    using enum EModuleType;
+    UInt_t   slot     {kMaxUInt};   // self-reference, redundant but useful
+    Int_t    model    {0};          // Hardware model number
+    Int_t    bank     {-1};         // Bank number (-1 = undefined)
+    UInt_t   header   {0};          // Header word to match (legacy)
+    UInt_t   headmask {0xffffffff}; // Mask for header matching (legacy)
+    UShort_t nchan    {0};          // Number of input channels of this module
+    bool     do_clear {true};       // If true, clear module for each event
+    EModuleType type  {kUndefined}; // Decoder module type
+    std::string cfgstr;             // Configuration parameters (mini database)
+    ModulePtr   module{nullptr};    // Decoder module instance for this slot
+
+    Int_t LoadModule( const THaCrateMap* map, UInt_t crate );
   };
 
   // Crate information
-  class CrateInfo_t {
-  public:
-    CrateInfo_t() : crate(kMaxUInt), crate_code(kUnknown), has_banks(false),
-      all_banks(false), sltdat(MAXSLOT) {}
+  struct CrateInfo_t {
     using enum ECrateCode; // from Decoder.h
     Int_t ParseSlotInfo( const THaCrateMap* crmap, std::string& line );
     bool  IsFastBus()     const { return crate_code == kFastbus; }
@@ -120,11 +123,11 @@ private:
     bool  IsScalerCrate() const { return crate_code == kScalerCrate; }
     void  SetBankInfo();
     bool  HasConfig() const;
-    UInt_t       crate;     // Crate number, redundant but sometimes useful
-    ECrateCode   crate_code;
-    bool         has_banks;
-    bool         all_banks;
-    std::unordered_map<UInt_t, SlotInfo_t> sltdat;
+    UInt_t       crate      {kMaxUInt};   // Crate number, redundant but useful
+    ECrateCode   crate_code {kUnknown};
+    bool         has_banks  {false};
+    bool         all_banks  {false};
+    std::unordered_map<UInt_t, SlotInfo_t> sltdat{MAXSLOT};
     std::set<UInt_t> used_slots;
     std::string  scalerloc;
   };

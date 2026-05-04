@@ -14,29 +14,29 @@
 //
 /////////////////////////////////////////////////////////////////////
 
-
 #include "THaCrateMap.h"
-#include "Database.h"   // for OpenDBFile, ReadFile, GetTZOffsetToLocal, IsD...
-#include "Decoder.h"    // for ECrateCode, ECrateCode::kScalerCrate, ECrateC...
+#include "Database.h"   // for CFile, OpenDBFile, ReadFile, WithDefaultTZ, GetTZOffsetToLocal, IsDBtimestamp, gNeedTZCorrection
+#include "Decoder.h"    // for Rtypes, kMaxUInt, ECrateCode
 #include "Helper.h"     // for ToInt, IntDigits
 #include "Module.h"     // for Module
-#include "TDatime.h"    // for TDatime
+#include "TClass.h"     // for TClass
+#include "TDatime.h"    // for TDatime, operator>=
 #include "TError.h"     // for Error, Warning
 #include "Textvars.h"   // for Trim
+#include <algorithm>    // for any_of, max, all_of
 #include <cassert>      // for assert
-#include <algorithm>    // for all_of, any_of
 #include <cctype>       // for isspace
 #include <cerrno>       // for errno
-#include <cstdio>       // for fclose, sscanf, size_t, FILE, ferror
+#include <cstdio>       // for size_t, sscanf, FILE, fclose, ferror
 #include <cstring>      // for strerror_r
 #include <exception>    // for exception
-#include <iomanip>      // for operator<<, setfill, setw
-#include <iostream>     // for basic_ostream, operator<<, basic_ios, basic_i...
-#include <ranges>       // for operator|, elements_view, values, views
-#include <sstream>      // for basic_istringstream
-#include <string>       // for basic_string, char_traits, string, operator<=>
-#include <string_view>  // for basic_string_view, operator==, operator""sv
-#include <utility>      // for get, operator<=>
+#include <iomanip>      // for operator<<, setw, setfill
+#include <iostream>     // for ostream, istream, operator<<, , cout, cerr, endl, ios
+#include <ranges>       // for __fn, operator|, views, values, operator==, keys
+#include <sstream>      // for istringstream
+#include <string>       // for string, char_traits, operator<=>, erase, getline, stoi, stoul
+#include <string_view>  // for string_view, operator==, operator<=>, operator""sv
+#include <utility>      // for get, move, operator<=>
 
 static constexpr size_t kInitialMapSize = 64;
 
@@ -193,6 +193,96 @@ std::string THaCrateMap::getConfigStr( UInt_t crate, UInt_t slot ) const
     }
   }
   return cfgstr;
+}
+
+//_____________________________________________________________________________
+Int_t
+THaCrateMap::SlotInfo_t::LoadModule( const THaCrateMap* map, UInt_t crate )
+{
+  // Create Module object for given slot
+  //
+  // This was THaSlotData::loadModule in earlier releases
+
+  const char* const here = "THaCrateMap::SlotInfo_t::LoadModule";
+
+  auto& moduletypes = Module::fgModuleTypes();
+  auto found = moduletypes.find(model);
+  if( found == moduletypes.end() ) {
+    Error( here, "Decoder module type %d not defined. Crate/slot "
+           "%u/%u will not be decoded.\nDid you forget to load a library?",
+           model, crate, slot );
+    return CM_ERR;
+  }
+  const auto& modtype = *found;
+  assert( modtype.fModel == model );
+
+  // Get the ROOT class for this type, if not already done
+  if( !modtype.fTClass ) {
+    modtype.fTClass = TClass::GetClass( modtype.fClassName );
+    if( !modtype.fTClass ) {
+      Error( here, "No ROOT dictionary for class %s. "
+             "Coding error. Call expert.", modtype.fClassName );
+      return CM_ERR;
+    }
+    // Equivalent of dynamic_cast
+    const char* const kBaseClassName = "Decoder::Module";
+    if( !modtype.fTClass->IsLoaded() ||
+        !modtype.fTClass->InheritsFrom(kBaseClassName) ) {
+      Error(here, "Class %s does not inherit from %s. "
+            "Coding error. Call expert.", modtype.fClassName, kBaseClassName);
+      return CM_ERR;
+    }
+  }
+  assert( modtype.fTClass );
+
+  // If necessary, create new module instance of this type
+  assert( !module || module->IsA() == modtype.fTClass );
+  if( !module ) {
+    module.reset(static_cast<Module*>( modtype.fTClass->New() ));
+    if( !module ) {
+      Error( here, "Failed to make Module %s on crate/slot %u/%u. "
+             "Coding error. Call expert.", modtype.fClassName, crate, slot );
+      return CM_ERR;
+    }
+  }
+
+  // Initialize the module
+  try {
+    module->Init( map->getConfigStr(crate, slot).c_str() );
+  }
+  catch( const exception& e ) {
+    Error(here, "Failed to initialize module for crate/slot "
+          "%u/%u: %s", crate, slot, e.what());
+    return CM_ERR;
+  }
+  // TODO to be revised. Avoid duplicating info?
+  module->SetSlot(crate, slot, header, headmask, model);
+  module->SetBank(bank);
+
+  return CM_OK;
+}
+
+//_____________________________________________________________________________
+Module* THaCrateMap::GetModule( UInt_t crate, UInt_t slot )
+{
+  // Get decoder module for crate/slot. If the slot is defined, but does not
+  // have an associated module, then try to create the module.
+  //
+  // If nullptr is returned, either the slot is not defined, no model is
+  // defined, or there is not Module class for the given model number.
+  //
+  // The returned pointer is non-owning and must not be deleted.
+
+  auto it = fCrateDat.find(crate);
+  if( it == fCrateDat.end() )
+    return nullptr; // crate not defined
+  auto& sd = it->second.sltdat;
+  auto jt = sd.find(slot);
+  if( jt == sd.end() )
+    return nullptr; // slot not defined
+  auto& sl = jt->second;
+  sl.LoadModule(this, crate);
+  return sl.module.get();
 }
 
 //_____________________________________________________________________________
@@ -395,10 +485,10 @@ void THaCrateMap::print(ostream& os) const
   // Slot parameter field widths. These are all longer than the print width of
   // the numbers in the columns underneath (except for header & mask), so they
   // can be const. Type int is what setw() wants.
-  static const array widths = { 2, // 2 = number of spaces between fields
-    ToInt(strlen("slot")),  ToInt(strlen("model")), ToInt(strlen("clear")),
-    ToInt(strlen("bank")),  10 /* "header" */,      10 /* "mask" */,
-    ToInt(strlen("nchan"))
+  constexpr array widths = { 2, // 2 = number of spaces between fields
+    ToInt("slot"sv.size()), ToInt("model"sv.size()), ToInt("clear"sv.size()),
+    ToInt("bank"sv.size()), 10 /* "header" */,       10 /* "mask" */,
+    ToInt("nchan"sv.size())
   };
   // Print the map
   ios::fmtflags oldf = os.setf(ios::left, ios::adjustfield);
