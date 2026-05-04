@@ -195,10 +195,12 @@ config 3561 cfg:thresh=250,window=70
     CHECK(crmap->getConfigStr(1,15) == "highres,  double=5"); // atm, no in-string whitespace collapsing
     CHECK(crmap->getConfigStr(1,16) == "debug highres");
 
+    // GetUsedCrates()
     const auto& used_crates = crmap->GetUsedCrates();
     CHECK(used_crates.size() == 3);
     CHECK(used_crates == set<UInt_t>{1,2,5});
 
+    // GetUsedSlots()
     const auto& used_slots = crmap->GetUsedSlots(1);
     CHECK(used_slots.size() == 5);
     CHECK(used_slots == set<UInt_t>{6,7,14,15,16});
@@ -206,6 +208,14 @@ config 3561 cfg:thresh=250,window=70
     CHECK(used_slots2.size() == 2);
     CHECK(used_slots2 == set<UInt_t>{4,2});
 
+    // GetModule()
+    Module* mod = crmap->GetModule(1, 6);
+    REQUIRE(mod);
+    CHECK(mod->GetCrate() == 1);
+    CHECK(mod->GetSlot() == 6);
+    //FIXME CHECK(mod->GetNumChan() == 96);
+
+    // Clear()
     crmap->Clear();
     CHECK_FALSE(crmap->isInit());
     CHECK(crmap->GetSize() == 0);
