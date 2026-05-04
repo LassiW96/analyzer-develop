@@ -22,8 +22,8 @@
 
 // NB: When updating this list, must also update var_type_info[] in VarType.cxx
 enum VarType : std::int8_t {   // NOLINT(*-int09-c, *-enum-initial-value)
-  kDouble = 0, kVarTypeBegin = kDouble, kFloat, kLong, kULong,
-  kInt, kUInt, kShort, kUShort, kChar, kUChar, kByte = kUChar,
+  kDouble = 0, kVarTypeBegin = kDouble, kFloat, kLong, kULong, kInt, kUInt,
+  kShort, kUShort, kChar, kInt8 = kChar, kUChar, kByte = kUChar, kUInt8 = kUChar,
   kObject, kTString, kString,
   kIntV, kUIntV, kFloatV, kDoubleV, kObjectV, kObjectPV,
   kIntM, kFloatM, kDoubleM,
