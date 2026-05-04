@@ -6,6 +6,7 @@
 /////////////////////////////////////////////////////////////////////
 
 #include "GenScaler.h"
+#include "Helper.h"       // for ToInt
 #include "THaSlotData.h"  // for THaSlotData
 #include <cassert>        // for assert
 #include <fstream>        // for ofstream
@@ -14,6 +15,7 @@
 #include <type_traits>    // for is_unsigned_v
 
 using namespace std;
+using namespace Podd;
 
 namespace Decoder {
 
@@ -145,7 +147,9 @@ namespace Decoder {
     evbuffer++;
     fIsDecoded = true;
     fDataArray.assign(evbuffer, evbuffer + fNumChan);
-    nfound += fNumChan;
+    // If fNumChan -> UShort_t, no more worries about narrowing conversion here.
+    // Alternatively, return UInt_t from this function (or remove it altogether)
+    nfound += ToInt(fNumChan);
     if( doload )
       LoadRates();
     return nfound;
