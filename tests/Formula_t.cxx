@@ -45,8 +45,8 @@ TEST_CASE("Formulas of Global Scalar Variables", "[Formula]") // NOLINT(*-functi
   Int_t i = 5;
   UInt_t u = 12;
   Float_t f = 3.14F;
-  Double_t d1 = 2.718;
-  Double_t d2 = 1.4142;
+  Double_t d1 = 2.718;  // NOLINT(*-use-std-numbers)
+  Double_t d2 = 1.4142; // NOLINT(*-use-std-numbers)
 
   vars->Define("i", i);
   vars->Define("u", u);
@@ -75,7 +75,7 @@ TEST_CASE("Formulas of Global Scalar Variables", "[Formula]") // NOLINT(*-functi
   auto fbad = make_shared<THaFormula>("f2", "i+d", false, vars.get());
 
   SECTION("Successful compilation") {
-    for( const auto& form : formulas) { ;
+    for( const auto& form : formulas) {
       REQUIRE_FALSE(form->IsZombie());
       REQUIRE_FALSE(form->IsError());
     }
@@ -163,7 +163,7 @@ TEST_CASE("Formulas of Global Vector Variables", "[Formula]") // NOLINT(*-functi
   REQUIRE(vars->Find("ai") == var);
   CHECK(var->IsArray());
   CHECK_FALSE(var->IsVarArray());
-  for( size_t i = 0; i < var->GetLen(); ++i )
+  for( Int_t i = 0; i < var->GetLen(); ++i )
     CHECK(var->GetValueInt(i) == ai[i]);
 
   var = vars->Define("vi", "vector<int>", vi);
@@ -173,7 +173,7 @@ TEST_CASE("Formulas of Global Vector Variables", "[Formula]") // NOLINT(*-functi
   REQUIRE(vars->Find("vi") == var);
   CHECK(var->IsArray());
   CHECK(var->IsVarArray());
-  for( size_t i = 0; i < var->GetLen(); ++i )
+  for( Int_t i = 0; i < var->GetLen(); ++i )
     CHECK(var->GetValueInt(i) == vi[i]);
 
   auto form  = make_shared<THaFormula>("form",  "7*ai-3", false, vars.get());
@@ -183,13 +183,13 @@ TEST_CASE("Formulas of Global Vector Variables", "[Formula]") // NOLINT(*-functi
   CHECK(form->GetNdata() == 5);
   CHECK(form->IsArray());
   CHECK_FALSE(form->IsVarArray());
-  for( size_t i = 0; i < form->GetNdata(); ++i )
+  for( Int_t i = 0; i < form->GetNdata(); ++i )
     CHECK(form->EvalInstance(i) == 7 * ai[i] - 3);
 
   // Changing values
   Int_t ival[] = { 44, 55, -66, -77, 8088};
   memcpy(ai, ival, 5*sizeof(*ai));
-  for( size_t i = 0; i < form->GetNdata(); ++i )
+  for( Int_t i = 0; i < form->GetNdata(); ++i )
     CHECK(form->EvalInstance(i) == 7 * ival[i] - 3);
 
   auto form2 = make_shared<THaFormula>("form2", "vi**2+5", false, vars.get());
@@ -199,7 +199,7 @@ TEST_CASE("Formulas of Global Vector Variables", "[Formula]") // NOLINT(*-functi
   CHECK(form2->GetNdata() == vi.size());
   CHECK(form2->IsArray());
   CHECK(form2->IsVarArray());
-  for( size_t i = 0; i < form2->GetNdata(); ++i )
+  for( Int_t i = 0; i < form2->GetNdata(); ++i )
     CHECK(form2->EvalInstance(i) == vi[i] * vi[i] + 5);
 
   delete [] ai;
