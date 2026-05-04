@@ -11,6 +11,7 @@
 #include "Module.h"
 #include "Textvars.h"  // for Podd::Tokenize
 #include "Helper.h"
+#include "TClass.h"
 #include "TError.h"
 #include "TString.h"
 #include <algorithm>
@@ -197,32 +198,24 @@ void Module::DoPrint() const
 }
 
 //_____________________________________________________________________________
-Module::TypeSet_t& Module::fgModuleTypes()
+Module::TypeIter_t Module::DoRegister( const ModuleType& modinfo )
 {
-  // Local storage for all defined Module types. Initialize here on first use
-  // (cf. http://www.parashift.com/c++-faq/static-init-order-on-first-use-members.html)
+  // Add given info in fgModuleTypes. This is run during static initialization.
+  // Therefore, we cannot assume that anything else is set up yet.
+  // In particular, the ROOT dictionary may not have been loaded, so we cannot
+  // assign modinfo.fTClass here.
 
-  static auto *fgModuleTypes = new TypeSet_t;
-
-  return *fgModuleTypes;
-}
-
-//_____________________________________________________________________________
-Module::TypeIter_t Module::DoRegister( const ModuleType& registration_info )
-{
-  // Add given info in fgModuleTypes
-
-  if( !registration_info.fClassName || !*registration_info.fClassName ) {
+  if( !modinfo.fClassName || !*modinfo.fClassName ) {
     ::Error( "Module::DoRegister", "Attempt to register empty class name. "
 	     "Coding error. Call expert." );
     return fgModuleTypes().end();
   }
 
-  auto [elem, success] = fgModuleTypes().insert(registration_info);
+  auto [elem, success] = fgModuleTypes().insert(modinfo);
 
   if( !success ) {
-    ::Error( "Module::DoRegister", "Attempt to register duplicate decoder module "
-	     "class \"%s\". Coding error. Call expert.", registration_info.fClassName );
+    ::Error( "Module::DoRegister", "Attempt to register duplicate decoder "
+             "module class \"%s\". Coding error. Call expert.", modinfo.fClassName );
     return fgModuleTypes().end();
   }
   // NB: std::set guarantees that iterators remain valid on further insertions,

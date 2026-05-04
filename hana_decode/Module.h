@@ -58,7 +58,7 @@ namespace Decoder {
     using TypeSet_t = std::set<ModuleType>;
     using TypeIter_t = TypeSet_t::iterator;
     static TypeSet_t& fgModuleTypes();
-    static TypeIter_t DoRegister( const ModuleType& registration_info );
+    static TypeIter_t DoRegister( const ModuleType& modinfo );
 #ifdef PODD_ENABLE_TESTS
     static ModuleType GetModuleType( Int_t ID );
 #endif
@@ -125,6 +125,7 @@ namespace Decoder {
     Int_t          GetBank()  const { return fBank; }
     Int_t          GetModelNum() const { return fModelNum; }
 
+    void           SetDebug( Int_t level ) { fDebug = level; }
     virtual void   SetDebugFile( std::ofstream* file )
     {
       if (file) fDebugFile = file;
@@ -193,6 +194,16 @@ namespace Decoder {
     ClassDefOverride(Module,0)  // A module in a crate and slot
 
   };
+
+//_____________________________________________________________________________
+inline Module::TypeSet_t& Module::fgModuleTypes()
+{
+  // Local storage for all defined Module types. Initialize here on first use
+  // (cf. https://isocpp.org/wiki/faq/ctors#static-init-order-on-first-use)
+
+  static TypeSet_t fgModuleTypes;
+  return fgModuleTypes;
+}
 
 }
 
