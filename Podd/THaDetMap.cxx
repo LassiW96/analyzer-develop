@@ -11,7 +11,7 @@
 #include "THaDetMap.h"
 #include "Decoder.h"      // for EModuleType
 #include "Helper.h"       // for ToInt, ParseInt, ALL
-#include "Module.h"       // for Module
+#include "Module.h"       // for Decoder::Module
 #include "TError.h"       // for Error
 #include "THaAnalyzer.h"  // for THaAnalyzer
 #include "THaCrateMap.h"  // for THaCrateMap
@@ -106,6 +106,7 @@ void THaDetMap::Module::MakeADC()
 void THaDetMap::CopyMap( const ModuleVec_t& map )
 {
   // Deep-copy the vector of module pointers
+  fMap.clear();
   fMap.reserve(map.capacity());
   for( const auto& m : map ) {
     fMap.emplace_back(std::make_unique<Module>(*m));
@@ -127,7 +128,6 @@ THaDetMap& THaDetMap::operator=( const THaDetMap& rhs )
   // THaDetMap assignment operator
 
   if( this != &rhs ) {
-    fMap.clear();
     CopyMap(rhs.fMap);
     fStartAtZero = rhs.fStartAtZero;
     fHasTags = rhs.fHasTags;
@@ -663,7 +663,10 @@ bool LOOPDONE( Int_t i, UInt_t n ) {
   return i < 0 or std::cmp_greater_equal(i, n);
 }
 bool NO_NEXT( Int_t& i, UInt_t n ) {
-  return std::cmp_greater_equal(i, n) or std::cmp_greater_equal(++i, n);
+  if( std::cmp_greater_equal(i, n) )
+    return true;
+  ++i;
+  return cmp_greater_equal(i, n);
 }
 }
 
