@@ -21,7 +21,7 @@ constexpr Double_t ref_pval = 0.1;
 static const char* const here = "verify.cxx";
 
 //_____________________________________________________________________________
-bool check(TFile& f, const char* hname, const char* desc, const TH1* tocheck)
+static bool check(TFile& f, const char* hname, const char* desc, const TH1* tocheck)
 {
   // Check if 1D histogram 'tocheck' matches 'hname' in file 'f'
 
@@ -144,16 +144,16 @@ UInt_t verify( const char* root_file, const char* ref_file = nullptr )
         //   SETBIT(err, 12);
         //   n_ps = TMath::Min(n_ps, n_ps2);
         // }
-        for( int i = 0; i < n_ps; ++i ) {
+        for( size_t i = 0; i < n_ps; ++i ) {
           if( ps[i] != psfact[i] ) {
-            Error(here, "Run parameters: prescale factor[%d] "
+            Error(here, "Run parameters: prescale factor[%lu] "
                   "mismatch, got %d, expected %d", i, ps[i], psfact[i]);
             SETBIT(err, 13);
           }
         }
         if( !TESTBIT(err, 13) ) {
           TString pstr;
-          for( int i = 0; i < n_ps; ++i ) {
+          for( size_t i = 0; i < n_ps; ++i ) {
             pstr += psfact[i];
             if( i + 1 != n_ps ) pstr += '/';
           }
