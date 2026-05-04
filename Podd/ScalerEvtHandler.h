@@ -144,13 +144,17 @@ protected:
   virtual Int_t DecodeBank( Decoder::CodaDecoder* codaevent, Decoder::GenScaler* scaler );
   virtual Int_t DecodeRoc( THaEvData* evdata, Decoder::GenScaler* scaler );
 
-  Int_t   AssignNormScaler() const;
-  EStatus DefVars();
+  Int_t   ReadDatabase( const TDatime& date ) override;
+  Int_t   DefineVariables( EMode mode = kDefine ) override;
+
+  EStatus AssignNormScaler() const;
+  EStatus MakeGlobalVars();
+  EStatus UnmakeGlobalVars();
+
   decltype(fScalers)::const_iterator FindScaler(UInt_t icrate, UInt_t islot) const;
   void    ParseMap( const std::vector<std::string>& words );
   void    ParseClock( const std::vector<std::string>& words );
   void    ParseVariable( const std::vector<std::string>& words );
-  Int_t   ReadDatabase( const TDatime& date ) override;
   void    SetIndices();
 
   static TBranch* MakeBranch( const std::string& name, const THaVar* var,

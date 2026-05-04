@@ -83,25 +83,7 @@ ScalerEvtHandler::ScalerEvtHandler( const char* name,
 ScalerEvtHandler::~ScalerEvtHandler()
 {
   // Remove all global variables we created
-  for( auto& svar: fScalarVars ) {
-    if( THaVar* pvar = svar.var ) {
-      gHaVars->Remove(pvar);
-      delete pvar;
-      svar.var = nullptr;
-    }
-  }
-  for( auto& sarr: fArrayVars ) {
-    if( THaVar* pvar = sarr.var ) {
-      gHaVars->Remove(pvar);
-      delete pvar;
-      sarr.var = nullptr;
-    }
-    for( THaVar* pvar: sarr.idxvars ) {
-      if( pvar )
-        gHaVars->Remove(pvar);
-    }
-    DeleteContainer(sarr.idxvars);
-  }
+  RemoveVariables();
 
   // The tree object is owned by ROOT since it gets associated wth the output
   // file, so DO NOT delete it here.
@@ -203,12 +185,12 @@ Int_t ScalerEvtHandler::Begin( THaRunBase* r )
     fScalerTree->Branch(name, &fEvtCount, tinfo, 4000);
 
     for( const auto& var: fScalarVars ) {
-      assert(var.var); // else bug in DefVars
+      assert(var.var); // else bug in MakeGlobalVars
       assert(&var.count == var.var->GetDataPointer());
       MakeBranch(var.name, var.var, fScalerTree);
     }
     for( const auto& arr: fArrayVars ) {
-      assert(arr.var); // else bug in DefVars
+      assert(arr.var); // else bug in MakeGlobalVars
       assert(arr.pCount == arr.var->GetDataPointer());
       MakeBranch(arr.name, arr.var, fScalerTree);
     }
@@ -595,7 +577,7 @@ void ScalerEvtHandler::ParseVariable( const vector<string>& words )
 }
 
 //_____________________________________________________________________________
-Int_t ScalerEvtHandler::AssignNormScaler() const
+THaAnalysisObject::EStatus ScalerEvtHandler::AssignNormScaler() const
 {
   const char* const here = "AssignNormScaler";
 
@@ -830,6 +812,13 @@ Int_t ScalerEvtHandler::ReadDatabase( const TDatime& date )
   if( !file )
     return kFileError;
 
+  fScalers.clear();
+  fClocks.clear();
+  fScalarVars.clear();
+  fArrayVars.clear();
+  fEvtCount = fEvtNum = 0;
+  fScalerTree = fIndexTree = nullptr; //FIXME less brute force?
+
   constexpr int LEN = 256;
   char cbuf[LEN];
 
@@ -838,7 +827,7 @@ Int_t ScalerEvtHandler::ReadDatabase( const TDatime& date )
     auto pos = line.find('#');
     if( pos != string::npos )
       line.erase(pos);
-    Podd::Trim(line);  // also erases trailing newline that fgets keeps
+    Trim(line);  // also erases trailing newline that fgets keeps
     if( line.empty() )
       continue;
 
@@ -861,45 +850,59 @@ Int_t ScalerEvtHandler::ReadDatabase( const TDatime& date )
       return kInitError;
     }
   }
+
+  // Identify indices of scalers[] vector to variables.
+  SetIndices();
+
   return kOK;
+}
+
+//_____________________________________________________________________________
+Int_t ScalerEvtHandler::DefineVariables( EMode mode )
+{
+  // Define/undefine global variables
+
+  if( Int_t ret = THaEvtTypeHandler::DefineVariables(mode) )
+    return ret;
+
+  // Since the data to be exported are scattered and non-regular, we need to
+  // do this explicitly, not through RTTI, unlike what typical
+  // THaAnalysisObjects do.
+
+  return mode == kDefine ? MakeGlobalVars() : UnmakeGlobalVars();
 }
 
 //_____________________________________________________________________________
 THaAnalysisObject::EStatus ScalerEvtHandler::Init(const TDatime& date)
 {
-  fStatus = THaEvtTypeHandler::Init(date);  // calls ReadDatabase
-  if( fStatus != kOK )
-    return fStatus;
+  // Initialize. Clear old configuration and create a new one.
+
+  RemoveVariables();   // No-op unless re-initializing
 
   // Set this from the analysis script
   //  AddEvtType(140);  // what events to look for
 
-  // Identify indices of scalers[] vector to variables.
-  SetIndices();
+  // Call standard Init, which calls our ReadDatabase and DefineVariables
+  fStatus = THaEvtTypeHandler::Init(date);
+  if( fStatus != kOK )
+    return fStatus;
 
   // Call LoadNormScaler or SetClock after scalers created
-  Int_t ret = AssignNormScaler();
-  if( ret != kOK )
-    return fStatus = kInitError;
-
-  // Define global variables on all scalerloc objects
-  fStatus = DefVars();
+  fStatus = AssignNormScaler();
 
   return fStatus;
 }
 
 //_____________________________________________________________________________
-THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
+THaAnalysisObject::EStatus ScalerEvtHandler::MakeGlobalVars()
 {
-  // Called after ParseVariables and SetIndices
+  // Define global variables referencing the data in fScalarVar and fArrayVar.
+  // Called from Init() via DefineVariables after ParseVariables and SetIndices.
 
   if( !gHaVars ) {
-    Error("DefVars", "No gHaVars ?!  Well, that's a problem !!");
+    Error("MakeGlobalVars", "No gHaVars ?!  Well, that's a problem !!");
     return kInitError;
   }
-  size_t Nvars = fScalarVars.size() + fArrayVars.size();
-  if( Nvars == 0 )
-    return kOK;
 
   // Variables
   for( auto& svar: fScalarVars ) {
@@ -976,6 +979,40 @@ THaAnalysisObject::EStatus ScalerEvtHandler::DefVars()
         sarr.idxvars.push_back(var);
         break;
     }
+  }
+  return kOK;
+}
+
+//_____________________________________________________________________________
+THaAnalysisObject::EStatus ScalerEvtHandler::UnmakeGlobalVars()
+{
+  // Remove all global variables that we defined
+
+  // We could be lazy and just call something like
+  //   gHaVars->RemoveRegexp( GetPrefix() + TString("*") );
+  // but that could double-delete variables with the same prefix, which
+  // technically aren't disallowed. So explicitly undo MakeGlobalVars().
+
+  for( auto& svar: fScalarVars ) {
+    if( THaVar* pvar = svar.var ) {
+      gHaVars->Remove(pvar);
+      delete pvar;
+      svar.var = nullptr;
+    }
+  }
+  for( auto& sarr: fArrayVars ) {
+    if( THaVar* pvar = sarr.var ) {
+      gHaVars->Remove(pvar);
+      delete pvar;
+      sarr.var = nullptr;
+    }
+    for( THaVar* pvar: sarr.idxvars ) {
+      if( pvar ) {
+        gHaVars->Remove(pvar);
+        delete pvar;
+      }
+    }
+    sarr.idxvars.clear();
   }
   return kOK;
 }
