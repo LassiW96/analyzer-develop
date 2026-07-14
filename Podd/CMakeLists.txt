@@ -9,6 +9,7 @@ set(LIBNAME Podd)
 set(src
   BankData.cxx                 BdataLoc.cxx                 ChannelData.cxx
   CodaRawDecoder.cxx           DAQInfoExtra.cxx             DecData.cxx
+  FadcStandaloneAnalyzer.cxx
   FileInclude.cxx              FixedArrayVar.cxx            InterStageModule.cxx
   MethodVar.cxx                MultiFileRun.cxx             ScalerEvtHandler.cxx
   SeqCollectionMethodVar.cxx   SeqCollectionVar.cxx         SimDecoder.cxx
